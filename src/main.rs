@@ -1,85 +1,20 @@
 mod auth;
+mod handler;
+mod swagger_docs;
 mod types;
 
-use crate::{
-    auth::AuthToken,
-    types::{DeleteRequest, GenericRequest, GenericResponse, PostRequest, PostResponse},
-};
-use actix_web::{
-    delete, get, http::StatusCode, middleware, post, web, App, HttpRequest, HttpResponse,
-    HttpServer,
-};
+use actix_web::{middleware, web, App, HttpServer};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
-#[get("/")]
-async fn index(req: HttpRequest) -> &'static str {
-    println!("REQ: {req:?}");
-    "Hello world!"
-}
-
-#[get("/auth")]
-async fn auth_index(_: AuthToken, req: HttpRequest) -> &'static str {
-    println!("REQ: {req:?}");
-    "Hello world!"
-}
-
-#[post("/create")]
-async fn create_thing(
-    req: HttpRequest,
-    mut request: web::Json<GenericRequest<(), PostRequest>>,
-) -> HttpResponse {
-    println!("REQ: {req:?}");
-
-    let name = format!(
-        "success: {}",
-        request
-            .data
-            .take()
-            .map(|d| d.name)
-            .unwrap_or("failed".into())
-    );
-    let resp = PostResponse { status: name };
-    let resp: GenericResponse<PostResponse> = GenericResponse {
-        msg: "success".into(),
-        data: resp,
-    };
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .status(StatusCode::OK)
-        .json(resp)
-}
-
-#[delete("/delete/{email}")]
-async fn delete_thing(
-    req: HttpRequest,
-    query: web::Query<DeleteRequest>,
-    path: web::Path<String>,
-) -> HttpResponse {
-    println!("REQ: {req:?}");
-
-    let query = query.into_inner();
-    let resp: GenericResponse<String> = GenericResponse {
-        msg: "Success".into(),
-        data: format!(
-            "email: {} permanent: {:#?}, when: {:#?}, height: {}",
-            path,
-            query.permanent.unwrap_or(false),
-            query.when.unwrap_or(64),
-            query.height
-        ),
-    };
-
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .status(StatusCode::OK)
-        .json(resp)
-}
+use crate::swagger_docs::ApiDoc;
 
 fn config(conf: &mut web::ServiceConfig) {
     let scope = web::scope("/v1")
-        .service(index)
-        .service(auth_index)
-        .service(create_thing)
-        .service(delete_thing);
+        .service(handler::index)
+        .service(handler::auth_index)
+        .service(handler::create_thing)
+        .service(handler::delete_thing);
     conf.service(scope);
 }
 
@@ -94,6 +29,9 @@ async fn main() -> std::io::Result<()> {
             // enable logger
             .wrap(middleware::Logger::default())
             .configure(config)
+            .service(
+                SwaggerUi::new("/docs-v1/{_:.*}").url("/api-docs/openapi.json", ApiDoc::openapi()),
+            )
     })
     .bind(("127.0.0.1", 8080))?
     .run()
