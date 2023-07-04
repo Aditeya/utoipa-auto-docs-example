@@ -1,6 +1,6 @@
 # Actix Web Auto Docs with Utoipa & Swagger-UI
 
-TODO: add blog post link
+For more information, please read the [blog post](https://blog.subcom.tech/actix-web-auto-docs-with-utoipa/).
 
 ## Running
 ```shell
